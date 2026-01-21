@@ -36,6 +36,7 @@ environment:
   model_path: <model_path>
   trtllm_repo: ''
   build_wheel: false
+  worker_env_var: "TRT_LLM_DISABLE_LOAD_WEIGHTS_IN_PARALLEL=True"
   work_dir: <full_path_to_work_dir>
 profiling:
   nsys_on: false

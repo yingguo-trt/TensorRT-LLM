@@ -43,6 +43,7 @@ environment:
   trtllm_repo: ''
   build_wheel: false
   work_dir: <full_path_to_work_dir>
+  worker_env_var: "TRT_LLM_DISABLE_LOAD_WEIGHTS_IN_PARALLEL=True"
 profiling:
   nsys_on: false
 accuracy:
