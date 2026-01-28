@@ -78,7 +78,7 @@ worker_config:
       dtype: fp8
     moe_config:
       backend: CUTLASS
-      use_low_precision_moe_combine: true
+      # TEMP_DISABLED: use_low_precision_moe_combine: true
     cache_transceiver_config:
       max_tokens_in_buffer: 16384
       backend: UCX
