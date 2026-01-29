@@ -85,12 +85,12 @@ worker_config:
       load_balancer:
         num_slots: 288
         layer_updates_per_iter: 1
-    nvfp4_gemm_config:
-      allowed_backends:
-      - cutlass
-      - cublaslt
-      - cutedsl
-      - cuda_core
+    # TEMP_DISABLED: nvfp4_gemm_config (not supported in container)
+    #   allowed_backends:
+    #     - cutlass
+    #     - cublaslt
+    #     - cutedsl
+    #     - cuda_core
     cache_transceiver_config:
       max_tokens_in_buffer: 8448
       backend: DEFAULT
