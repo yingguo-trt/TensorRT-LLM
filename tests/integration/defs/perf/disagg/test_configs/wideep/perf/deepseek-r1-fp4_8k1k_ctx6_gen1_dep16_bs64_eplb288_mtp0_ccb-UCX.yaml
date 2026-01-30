@@ -76,7 +76,7 @@ worker_config:
     print_iter_log: true
     kv_cache_config:
       enable_block_reuse: false
-      free_gpu_memory_fraction: 0.3
+      free_gpu_memory_fraction: 0.7
       dtype: fp8
     moe_config:
       backend: WIDEEP
@@ -102,7 +102,7 @@ worker_config:
     disable_overlap_scheduler: true
     kv_cache_config:
       enable_block_reuse: false
-      free_gpu_memory_fraction: 0.35
+      free_gpu_memory_fraction: 0.75
       dtype: fp8
     cache_transceiver_config:
       max_tokens_in_buffer: 8448
