@@ -16,16 +16,19 @@ class LogWriter(object):
     def print_to_console(self, file_name):
         log_file_name = os.path.join(self.log_path, file_name)
         logger.info(f"Log file: {log_file_name}")
+        logger.info("=" * 80)
         try:
             with open(log_file_name, "r", encoding="utf-8", errors="replace") as log_file:
                 for line in log_file:
-                    logger.debug(line.rstrip("\n"))
+                    #Changed from debug to info so logs are captured by pytest and appear in JUnit XML
+                    logger.info(line.rstrip("\n"))
         except FileNotFoundError:
             logger.error(f"File not found: {log_file_name}")
         except PermissionError:
             logger.error(f"Permission denied: {log_file_name}")
         except Exception as e:
             logger.error(f"Error reading file: {e}")
+        logger.info("=" * 80)
 
 
 class LogParser(object):
