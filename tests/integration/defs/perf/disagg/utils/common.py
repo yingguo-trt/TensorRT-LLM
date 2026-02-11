@@ -189,6 +189,34 @@ class EnvManager:
     def get_debug_job_id() -> str:
         return os.getenv("DEBUG_JOB_ID", "908390")
 
+    @staticmethod
+    def get_env_bool(env_var: str, default: bool = False) -> bool:
+        """Get boolean value from environment variable.
+
+        Supports multiple formats: 1/0, true/false, yes/no, on/off (case-insensitive).
+
+        Args:
+            env_var: Environment variable name
+            default: Default value if not set or invalid
+
+        Returns:
+            bool: Parsed boolean value
+
+        Examples:
+            >>> os.environ["DISAGG_VERBOSE_LOGS"] = "1"
+            >>> EnvManager.get_env_bool("DISAGG_VERBOSE_LOGS")
+            True
+            >>> EnvManager.get_env_bool("NONEXISTENT", default=False)
+            False
+        """
+        value = os.getenv(env_var, "").strip().lower()
+        if value in ("1", "true", "yes", "on"):
+            return True
+        elif value in ("0", "false", "no", "off"):
+            return False
+        else:
+            return default
+
 
 CONFIG_BASE_DIR = os.path.join(EnvManager.get_work_dir(), "test_configs")
 

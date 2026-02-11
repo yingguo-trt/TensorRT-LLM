@@ -552,41 +552,95 @@ class JobManager:
             return False
 
     @staticmethod
-    def _print_logs_to_console(job_id: str, result_dir: str) -> None:
-        """Print SLURM log and all .log/.yaml files in result_dir to console.
+    def _print_logs_to_console(job_id: str, result_dir: str, verbose: bool = None) -> None:
+        """Print SLURM log and result logs to console with intelligent filtering.
 
         Args:
             job_id: SLURM job ID for finding the slurm log file
             result_dir: Result directory containing log and config files
+            verbose: If True, print full logs; if False, only errors; if None, read from env
         """
-        # Print the slurm log to console (check if exists first)
+        # Determine verbose mode from environment if not specified
+        if verbose is None:
+            verbose = EnvManager.get_env_bool("DISAGG_VERBOSE_LOGS", default=False)
+
+        logger.info(f"\n{'=' * 80}")
+        logger.info(f"LOG PRINTING MODE: {'VERBOSE (Full Logs)' if verbose else 'SMART (Errors Only)'}")
+        logger.info(f"  Set DISAGG_VERBOSE_LOGS=1 to enable verbose mode")
+        logger.info(f"{'=' * 80}\n")
+
+        # Print SLURM log (last 100 lines or errors only)
         slurm_log_path = os.path.join(EnvManager.get_work_dir(), f"slurm-{job_id}.out")
         if os.path.exists(slurm_log_path):
             slurm_log_writer = LogWriter(EnvManager.get_work_dir())
-            slurm_log_writer.print_to_console(f"slurm-{job_id}.out")
+            logger.info(f"\n{'=' * 80}")
+            logger.info("SLURM JOB OUTPUT")
+            logger.info(f"{'=' * 80}")
+            # SLURM log: print last 100 lines in normal mode, full in verbose
+            slurm_log_writer.print_to_console(
+                f"slurm-{job_id}.out", error_only=False, max_lines=0 if verbose else 100
+            )
         else:
             logger.warning(f"SLURM log file not found: {slurm_log_path}")
 
-        # Print all .log and .yaml files in result_dir (except output_server.log)
         if not os.path.exists(result_dir):
             logger.warning(f"Result directory not found: {result_dir}")
             return
 
-        log_writer = LogWriter(result_dir)
-        files_to_print = []
+        # Categorize log files
+        critical_logs = []  # 6_bench.log, 7_accuracy_eval_*.log
+        worker_logs = []  # 3_output_*.log
+        other_logs = []  # 5_wait_server.log, etc.
+        config_files = []  # *.yaml
+
         for file in os.listdir(result_dir):
-            if (file.endswith(".log") or file.endswith(".yaml")) and file != "output_server.log":
-                files_to_print.append(file)
+            if file.endswith(".yaml"):
+                config_files.append(file)
+            elif file.startswith("6_bench") or file.startswith("7_accuracy"):
+                critical_logs.append(file)
+            elif file.startswith("3_output"):
+                worker_logs.append(file)
+            elif file.endswith(".log") and file != "output_server.log":
+                other_logs.append(file)
 
-        # Sort files for consistent output order
-        files_to_print.sort()
+        log_writer = LogWriter(result_dir)
 
-        for file in files_to_print:
-            file_path = os.path.join(result_dir, file)
-            if os.path.exists(file_path):
-                log_writer.print_to_console(file)
-            else:
-                logger.warning(f"Log file not found: {file}")
+        # Always print critical logs (full)
+        if critical_logs:
+            logger.info(f"\n{'=' * 80}")
+            logger.info("CRITICAL LOGS (Full Content)")
+            logger.info(f"{'=' * 80}")
+            for file in sorted(critical_logs):
+                log_writer.print_to_console(file, error_only=False, max_lines=0)
+
+        # Print worker logs (error only unless verbose)
+        if worker_logs:
+            logger.info(f"\n{'=' * 80}")
+            logger.info("WORKER LOGS" + (" (Full Content)" if verbose else " (Errors Only)"))
+            logger.info(f"{'=' * 80}")
+            for file in sorted(worker_logs):
+                if verbose:
+                    # Verbose mode: print full worker logs but limit to 500 lines to avoid overflow
+                    log_writer.print_to_console(file, error_only=False, max_lines=500)
+                else:
+                    # Normal mode: only print errors with context
+                    log_writer.print_to_console(file, error_only=True, context_lines=5)
+
+        # Print other logs (error only unless verbose)
+        if other_logs:
+            logger.info(f"\n{'=' * 80}")
+            logger.info("OTHER LOGS" + (" (Full Content)" if verbose else " (Errors Only)"))
+            logger.info(f"{'=' * 80}")
+            for file in sorted(other_logs):
+                log_writer.print_to_console(file, error_only=not verbose)
+
+        # Print config files (always full, they're small)
+        if config_files:
+            logger.info(f"\n{'=' * 80}")
+            logger.info("CONFIGURATION FILES")
+            logger.info(f"{'=' * 80}")
+            for file in sorted(config_files):
+                log_writer.print_to_console(file, error_only=False, max_lines=0)
 
     @staticmethod
     def _check_accuracy_result(

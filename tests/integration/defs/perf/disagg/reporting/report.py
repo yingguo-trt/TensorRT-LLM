@@ -13,21 +13,102 @@ class LogWriter(object):
     def __init__(self, log_path: str):
         self.log_path = log_path
 
-    def print_to_console(self, file_name):
+    def print_to_console(
+        self, file_name: str, error_only: bool = False, max_lines: int = 0, context_lines: int = 5
+    ):
+        """Print log file to console with optional error filtering.
+
+        Args:
+            file_name: Log file name
+            error_only: If True, only print ERROR/FAILED lines and context
+            max_lines: Maximum lines to print (0 = unlimited)
+            context_lines: Number of lines to show before/after error (default: 5)
+        """
         log_file_name = os.path.join(self.log_path, file_name)
         logger.info(f"Log file: {log_file_name}")
+
+        # Get and display file size
+        try:
+            file_size = os.path.getsize(log_file_name)
+            file_size_mb = file_size / (1024 * 1024)
+            logger.info(f"File size: {file_size_mb:.2f} MB")
+        except:
+            file_size_mb = 0
+
         logger.info("=" * 80)
+
         try:
             with open(log_file_name, "r", encoding="utf-8", errors="replace") as log_file:
-                for line in log_file:
-                    #Changed from debug to info so logs are captured by pytest and appear in JUnit XML
+                # Use tail mode for large files (> 2MB) to avoid memory issues
+                if file_size_mb > 2.0:
+                    log_file.seek(0, 2)  # Move to end of file
+                    file_size = log_file.tell()
+                    # Read last 100KB or entire file, whichever is smaller
+                    read_size = min(102400, file_size)
+                    log_file.seek(max(0, file_size - read_size))
+                    content = log_file.read()
+                    lines = content.splitlines()
+                    logger.info(f"[Tail Mode] Showing last {len(lines)} lines (from last {read_size/1024:.1f} KB)")
+                else:
+                    lines = log_file.readlines()
+
+            if error_only:
+                # Extract error lines with context (±context_lines)
+                # Enhanced keywords to detect OOM, crashes, and termination errors
+                error_keywords = [
+                    "ERROR", "FAIL", "EXCEPTION", "TRACEBACK", "[E]", "FATAL",
+                    "OOM", "Out Of Memory", "oom_kill", "Killed",
+                    "Terminated", "Cancelled", "Aborted", "exit code"
+                ]
+                error_indices = []
+                for i, line in enumerate(lines):
+                    # Check both original and uppercase for case-insensitive matching
+                    if any(keyword in line or keyword in line.upper() for keyword in error_keywords):
+                        error_indices.append(i)
+
+                if error_indices:
+                    # Print errors with context
+                    printed_ranges = set()
+                    for idx in error_indices:
+                        start = max(0, idx - context_lines)
+                        end = min(len(lines), idx + context_lines + 1)
+
+                        # Avoid duplicate printing of overlapping ranges
+                        range_key = (start, end)
+                        if range_key not in printed_ranges:
+                            printed_ranges.add(range_key)
+
+                            if start > 0:
+                                logger.info(f"... (skipped {start} lines) ...")
+
+                            for i in range(start, end):
+                                prefix = ">>> " if i == idx else "    "
+                                logger.info(f"{prefix}{lines[i].rstrip()}")
+
+                            if end < len(lines):
+                                logger.info("-" * 80)
+
+                    logger.info(f"\nTotal: Found {len(error_indices)} error(s) in {len(lines)} lines")
+                else:
+                    logger.info("✓ No errors found in log file")
+            else:
+                # Print all or limited lines
+                lines_to_print = lines if max_lines == 0 else lines[:max_lines]
+                for line in lines_to_print:
+                    # Changed from debug to info so logs are captured by pytest and appear in JUnit XML
                     logger.info(line.rstrip("\n"))
+
+                if max_lines > 0 and len(lines) > max_lines:
+                    skipped = len(lines) - max_lines
+                    logger.info(f"\n... ({skipped} more lines truncated, total: {len(lines)} lines)")
+
         except FileNotFoundError:
             logger.error(f"File not found: {log_file_name}")
         except PermissionError:
             logger.error(f"Permission denied: {log_file_name}")
         except Exception as e:
             logger.error(f"Error reading file: {e}")
+
         logger.info("=" * 80)
 
 

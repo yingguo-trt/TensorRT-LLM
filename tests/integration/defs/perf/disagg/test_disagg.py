@@ -123,7 +123,22 @@ class TestDisaggBenchmark:
 
             # Check results and generate report
             result = JobManager.check_result(job_id, test_config, timestamps, full_test_name)
-            assert result["success"], f"Performance test failed: {job_id}"
+
+            # Construct detailed error message if test failed
+            if not result["success"]:
+                result_dir = JobManager.get_result_dir(test_config)
+                error_msg = f"\n{'=' * 80}\n"
+                error_msg += f"PERFORMANCE TEST FAILED\n"
+                error_msg += f"{'=' * 80}\n"
+                error_msg += f"Test ID:     {test_config.test_id}\n"
+                error_msg += f"Job ID:      {job_id}\n"
+                error_msg += f"Result Dir:  {result_dir}\n"
+                if "error" in result:
+                    error_msg += f"Error:       {result['error']}\n"
+                error_msg += f"{'=' * 80}\n"
+                assert False, error_msg
+            else:
+                assert result["success"], f"Performance test failed: {job_id}"
 
         except Exception as e:
             test_tracker.end_test_case()
@@ -199,9 +214,36 @@ class TestDisaggBenchmark:
 
             # Check results and validate accuracy
             result = JobManager.check_result(job_id, test_config, timestamps, full_test_name)
-            assert result["success"], (
-                f"Accuracy test failed: {result.get('error', 'Unknown error')}"
-            )
+
+            # Construct detailed error message if test failed
+            if not result["success"]:
+                result_dir = JobManager.get_result_dir(test_config)
+                error_msg = f"\n{'=' * 80}\n"
+                error_msg += f"ACCURACY TEST FAILED\n"
+                error_msg += f"{'=' * 80}\n"
+                error_msg += f"Test ID:     {test_config.test_id}\n"
+                error_msg += f"Job ID:      {job_id}\n"
+                error_msg += f"Result Dir:  {result_dir}\n"
+
+                if "error" in result:
+                    error_msg += f"Error:       {result['error']}\n"
+
+                # Add failed accuracy checks details
+                if "accuracy_runs" in result:
+                    error_msg += "\nFailed Accuracy Checks:\n"
+                    for run in result["accuracy_runs"]:
+                        if not run.all_passed:
+                            error_msg += f"  Run: {run.run_name}\n"
+                            for ds in run.results:
+                                if not ds.passed:
+                                    error_msg += f"    - {ds.dataset}: expected={ds.expected:.4f}, actual={ds.actual:.4f}\n"
+
+                error_msg += f"{'=' * 80}\n"
+                assert False, error_msg
+            else:
+                assert result["success"], (
+                    f"Accuracy test failed: {result.get('error', 'Unknown error')}"
+                )
 
         except Exception as e:
             test_tracker.end_test_case()
@@ -283,7 +325,34 @@ class TestDisaggBenchmark:
 
             # Check results - this will handle both perf CSV writing AND accuracy validation
             result = JobManager.check_result(job_id, test_config, timestamps, full_test_name)
-            assert result["success"], f"Stress test failed: {result.get('error', 'Unknown error')}"
+
+            # Construct detailed error message if test failed
+            if not result["success"]:
+                result_dir = JobManager.get_result_dir(test_config)
+                error_msg = f"\n{'=' * 80}\n"
+                error_msg += f"STRESS TEST FAILED\n"
+                error_msg += f"{'=' * 80}\n"
+                error_msg += f"Test ID:     {test_config.test_id}\n"
+                error_msg += f"Job ID:      {job_id}\n"
+                error_msg += f"Result Dir:  {result_dir}\n"
+
+                if "error" in result:
+                    error_msg += f"Error:       {result['error']}\n"
+
+                # Add accuracy details if available
+                if "accuracy_result" in result and "accuracy_runs" in result["accuracy_result"]:
+                    error_msg += "\nFailed Accuracy Checks:\n"
+                    for run in result["accuracy_result"]["accuracy_runs"]:
+                        if not run.all_passed:
+                            error_msg += f"  Run: {run.run_name}\n"
+                            for ds in run.results:
+                                if not ds.passed:
+                                    error_msg += f"    - {ds.dataset}: expected={ds.expected:.4f}, actual={ds.actual:.4f}\n"
+
+                error_msg += f"{'=' * 80}\n"
+                assert False, error_msg
+            else:
+                assert result["success"], f"Stress test failed: {result.get('error', 'Unknown error')}"
 
         except Exception as e:
             test_tracker.end_test_case()
